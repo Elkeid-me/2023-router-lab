@@ -1,0 +1,114 @@
+{
+  "tests": [
+    {
+      "name": "Routing.Forward",
+      "setup": "if [ ! -f \".built\" ]; then touch .built && rm -rf test_classroom && rm -rf build && git clone https://github.com/N2Sys-EDU/lab3-test.git test_classroom && cd test_classroom && mkdir -p build && cd build && cmake .. && make && cd ../.. && mkdir -p build/ && cp test_classroom/libsimulator.a test_classroom/build/lab3_test build/ && cd build && cmake .. && make && cd .. ; fi",
+      "run": "cd build && ./lab3_test --gtest_filter='Routing.Forward'",
+      "input": "",
+      "output": "",
+      "comparison": "exact",
+      "timeout": 1,
+      "points": 10
+    },
+    {
+      "name": "Routing.Accessibility",
+      "setup": "if [ ! -f \".built\" ]; then touch .built && rm -rf test_classroom && rm -rf build && git clone https://github.com/N2Sys-EDU/lab3-test.git test_classroom && cd test_classroom && mkdir -p build && cd build && cmake .. && make && cd ../.. && mkdir -p build/ && cp test_classroom/libsimulator.a test_classroom/build/lab3_test build/ && cd build && cmake .. && make && cd .. ; fi",
+      "run": "cd build && ./lab3_test --gtest_filter='Routing.Accessibility'",
+      "input": "",
+      "output": "",
+      "comparison": "exact",
+      "timeout": 1,
+      "points": 10
+    },
+    {
+      "name": "Routing.StaticOptimal",
+      "setup": "if [ ! -f \".built\" ]; then touch .built && rm -rf test_classroom && rm -rf build && git clone https://github.com/N2Sys-EDU/lab3-test.git test_classroom && cd test_classroom && mkdir -p build && cd build && cmake .. && make && cd ../.. && mkdir -p build/ && cp test_classroom/libsimulator.a test_classroom/build/lab3_test build/ && cd build && cmake .. && make && cd .. ; fi",
+      "run": "cd build && ./lab3_test --gtest_filter='Routing.StaticOptimal'",
+      "input": "",
+      "output": "",
+      "comparison": "exact",
+      "timeout": 1,
+      "points": 10
+    },
+    {
+      "name": "Routing.DynamicOptimalAdd",
+      "setup": "if [ ! -f \".built\" ]; then touch .built && rm -rf test_classroom && rm -rf build && git clone https://github.com/N2Sys-EDU/lab3-test.git test_classroom && cd test_classroom && mkdir -p build && cd build && cmake .. && make && cd ../.. && mkdir -p build/ && cp test_classroom/libsimulator.a test_classroom/build/lab3_test build/ && cd build && cmake .. && make && cd .. ; fi",
+      "run": "cd build && ./lab3_test --gtest_filter='Routing.DynamicOptimalAdd'",
+      "input": "",
+      "output": "",
+      "comparison": "exact",
+      "timeout": 1,
+      "points": 10
+    },
+    {
+      "name": "Routing.DynamicOptimalDel",
+      "setup": "if [ ! -f \".built\" ]; then touch .built && rm -rf test_classroom && rm -rf build && git clone https://github.com/N2Sys-EDU/lab3-test.git test_classroom && cd test_classroom && mkdir -p build && cd build && cmake .. && make && cd ../.. && mkdir -p build/ && cp test_classroom/libsimulator.a test_classroom/build/lab3_test build/ && cd build && cmake .. && make && cd .. ; fi",
+      "run": "cd build && ./lab3_test --gtest_filter='Routing.DynamicOptimalDel'",
+      "input": "",
+      "output": "",
+      "comparison": "exact",
+      "timeout": 1,
+      "points": 10
+    },
+    {
+      "name": "Routing.DynamicOptimalMix",
+      "setup": "if [ ! -f \".built\" ]; then touch .built && rm -rf test_classroom && rm -rf build && git clone https://github.com/N2Sys-EDU/lab3-test.git test_classroom && cd test_classroom && mkdir -p build && cd build && cmake .. && make && cd ../.. && mkdir -p build/ && cp test_classroom/libsimulator.a test_classroom/build/lab3_test build/ && cd build && cmake .. && make && cd .. ; fi",
+      "run": "cd build && ./lab3_test --gtest_filter='Routing.DynamicOptimalMix'",
+      "input": "",
+      "output": "",
+      "comparison": "exact",
+      "timeout": 1,
+      "points": 10
+    },
+    {
+      "name": "NAT.Basic",
+      "setup": "if [ ! -f \".built\" ]; then touch .built && rm -rf test_classroom && rm -rf build && git clone https://github.com/N2Sys-EDU/lab3-test.git test_classroom && cd test_classroom && mkdir -p build && cd build && cmake .. && make && cd ../.. && mkdir -p build/ && cp test_classroom/libsimulator.a test_classroom/build/lab3_test build/ && cd build && cmake .. && make && cd .. ; fi",
+      "run": "cd build && ./lab3_test --gtest_filter='NAT.Basic'",
+      "input": "",
+      "output": "",
+      "comparison": "exact",
+      "timeout": 1,
+      "points": 10
+    },
+    {
+      "name": "NAT.Dynamic",
+      "setup": "if [ ! -f \".built\" ]; then touch .built && rm -rf test_classroom && rm -rf build && git clone https://github.com/N2Sys-EDU/lab3-test.git test_classroom && cd test_classroom && mkdir -p build && cd build && cmake .. && make && cd ../.. && mkdir -p build/ && cp test_classroom/libsimulator.a test_classroom/build/lab3_test build/ && cd build && cmake .. && make && cd .. ; fi",
+      "run": "cd build && ./lab3_test --gtest_filter='NAT.Dynamic'",
+      "input": "",
+      "output": "",
+      "comparison": "exact",
+      "timeout": 1,
+      "points": 10
+    },
+    {
+      "name": "FireWall.Block1",
+      "setup": "if [ ! -f \".built\" ]; then touch .built && rm -rf test_classroom && rm -rf build && git clone https://github.com/N2Sys-EDU/lab3-test.git test_classroom && cd test_classroom && mkdir -p build && cd build && cmake .. && make && cd ../.. && mkdir -p build/ && cp test_classroom/libsimulator.a test_classroom/build/lab3_test build/ && cd build && cmake .. && make && cd .. ; fi",
+      "run": "cd build && ./lab3_test --gtest_filter='FireWall.Block1'",
+      "input": "",
+      "output": "",
+      "comparison": "exact",
+      "timeout": 1,
+      "points": 10
+    },
+    {
+      "name": "FireWall.Block2",
+      "setup": "if [ ! -f \".built\" ]; then touch .built && rm -rf test_classroom && rm -rf build && git clone https://github.com/N2Sys-EDU/lab3-test.git test_classroom && cd test_classroom && mkdir -p build && cd build && cmake .. && make && cd ../.. && mkdir -p build/ && cp test_classroom/libsimulator.a test_classroom/build/lab3_test build/ && cd build && cmake .. && make && cd .. ; fi",
+      "run": "cd build && ./lab3_test --gtest_filter='FireWall.Block2'",
+      "input": "",
+      "output": "",
+      "comparison": "exact",
+      "timeout": 1,
+      "points": 10
+    },
+    {
+      "name": "General.Static",
+      "setup": "if [ ! -f \".built\" ]; then touch .built && rm -rf test_classroom && rm -rf build && git clone https://github.com/N2Sys-EDU/lab3-test.git test_classroom && cd test_classroom && mkdir -p build && cd build && cmake .. && make && cd ../.. && mkdir -p build/ && cp test_classroom/libsimulator.a test_classroom/build/lab3_test build/ && cd build && cmake .. && make && cd .. ; fi",
+      "run": "cd build && ./lab3_test --gtest_filter='General.Static'",
+      "input": "",
+      "output": "",
+      "comparison": "exact",
+      "timeout": 1,
+      "points": 10
+    }
+  ]
+}
