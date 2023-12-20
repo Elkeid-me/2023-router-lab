@@ -1,7 +1,9 @@
 #include "router_prototype.hxx"
 
-class Router : public RouterBase {
+class Router : public RouterBase
+{
 public:
-    void router_init(int port_num, int external_port, char* external_addr, char* available_addr);
-    int router(int in_port, char* packet);
+    void router_init(int port_num, int external_port, char *external_addr,
+                     char *available_addr);
+    int router(int in_port, char *packet);
 };
