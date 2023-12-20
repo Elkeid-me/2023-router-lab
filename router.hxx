@@ -1,4 +1,4 @@
-#include "router_prototype.h"
+#include "router_prototype.hxx"
 
 class Router : public RouterBase {
 public:

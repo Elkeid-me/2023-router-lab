@@ -10,7 +10,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
 add_compile_options(-Wall)
 set(CMAKE_BUILD_TYPE Release)
 
-set(SRC_FILES router.cpp)
+set(SRC_FILES router.cxx)
 
 add_library(router STATIC ${SRC_FILES})
 find_library(LIB_SIMULATOR simulator build/)

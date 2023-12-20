@@ -1,4 +1,4 @@
-#include "router.h"
+#include "router.hxx"
 
 RouterBase* create_router_object() {
     return new Router;
