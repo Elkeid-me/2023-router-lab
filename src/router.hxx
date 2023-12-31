@@ -1,5 +1,7 @@
 #include "router_prototype.hxx"
 #include <cstdint>
+#include <queue>
+#include <unordered_map>
 
 enum class header_type : std::uint8_t
 {
@@ -21,10 +23,10 @@ enum class command_type
 class header
 {
 private:
-    std::uint32_t src;
-    std::uint32_t dst;
-    header_type type;
-    std::uint16_t length;
+    std::uint32_t m_src;
+    std::uint32_t m_dst;
+    header_type m_type;
+    std::uint16_t m_length;
 
 public:
     std::uint32_t get_src() const;
@@ -32,13 +34,30 @@ public:
     header_type get_type() const;
     std::uint16_t get_length() const;
 
+    void set_src(std::uint32_t);
+    void set_dst(std::uint32_t);
+    void set_type(header_type);
+    void set_length(std::uint16_t);
+
     void make_header(std::uint32_t, std::uint32_t, header_type, std::uint16_t);
 };
 
 class Router : public RouterBase
 {
+private:
+    std::unordered_map<std::uint32_t, std::uint32_t> m_nat_map;
+    std::unordered_map<std::uint32_t, std::uint32_t> m_dv_map;
+    std::unordered_map<std::uint32_t, bool> m_block_map;
+    std::queue<std::uint32_t> m_available_external_addrs;
+
+    int m_external_port{0};
+    int m_port_num{0};
+
+    int process_data_packet(int, char *);
+    int process_dv_packet(int, char *);
+    int process_control_packet(int, char *);
+
 public:
-    void router_init(int port_num, int external_port, char *external_addr,
-                     char *available_addr);
-    int router(int in_port, char *packet);
+    void router_init(int, int, char *, char *);
+    int router(int, char *);
 };
