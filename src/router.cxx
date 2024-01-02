@@ -85,6 +85,7 @@ static std::pair<std::uint32_t, std::uint32_t> parser_ip_range(char *ip)
     *slash_ptr = '\0';
     std::uint32_t mask{mask_1[std::strtoll(slash_ptr + 1, nullptr, 10)]};
     std::uint32_t prefix{parser_ip_str(ip) & mask};
+    log_debug("ip ", prefix, ' ', mask);
     return {prefix, prefix + ~mask};
 }
 
@@ -105,10 +106,6 @@ void Router::packet_dv(char *packet)
                             dv_size * sizeof(dv_table_entry) +
                                 ex_dv_size * sizeof(ex_dv_table_entry) +
                                 2u * sizeof(std::uint16_t));
-    if (dv_size * sizeof(dv_table_entry) + ex_dv_size * sizeof(ex_dv_table_entry) +
-            2u * sizeof(std::uint16_t) + sizeof(header) >
-        16384)
-        log_debug("Too long");
     char *payload_ptr{packet + sizeof(header)};
     *reinterpret_cast<std::uint16_t *>(payload_ptr) = dv_size;
     *reinterpret_cast<std::uint16_t *>(payload_ptr + sizeof(std::uint16_t)) = ex_dv_size;
@@ -199,7 +196,18 @@ int Router::process_data_packet(int in_port, char *packet)
     bool src_is_ex{is_ex_ip(src)}, dst_is_ex{is_ex_ip(dst)};
     if (src_is_ex)
     {
-        return -1;
+        if (dst_is_ex)
+        {
+            auto reverse_nat_ip_iter{m_reverse_nat_map.find(dst)};
+            if (reverse_nat_ip_iter == m_reverse_nat_map.end())
+                return -1;
+            dst = reverse_nat_ip_iter->second;
+            header_ptr->set_dst(dst);
+        }
+        auto dst_port_iter{m_dv_map.find(dst)};
+        if (dst_port_iter == m_dv_map.end())
+            return 1;
+        return dst_port_iter->second.port;
     }
     else
     {
@@ -326,7 +334,7 @@ void Router::router_init(int port_num, int external_port, char *external_addr,
 {
     m_port_num = port_num;
     m_ex_port = external_port;
-    m_port_value.assign(port_num, -1);
+    m_port_value.assign(port_num + 1, -1);
     m_port_value[0] = 0;
     m_port_value[1] = 0;
     if (m_ex_port != 0)
@@ -335,7 +343,7 @@ void Router::router_init(int port_num, int external_port, char *external_addr,
         auto [ex_ip_start, ex_ip_end]{parser_ip_range(external_addr)};
         m_ex_dv_map.insert({{ex_ip_start, ex_ip_end}, {0, m_ex_port}});
         m_available_addrs.reserve(256);
-        auto [available_ip_start, available_ip_end]{parser_ip_range(external_addr)};
+        auto [available_ip_start, available_ip_end]{parser_ip_range(available_addr)};
         for (auto ip : std::views::iota(available_ip_start, available_ip_end))
             m_available_addrs.push_back(ip);
     }
