@@ -92,7 +92,7 @@ static std::pair<std::uint32_t, std::uint32_t> parser_ip_range(char *ip)
 static_assert(std::endian::native == std::endian::little);
 static_assert(sizeof(header) == 12);
 
-static bool is_ex_ip(std::uint32_t ip) { return (ip >> 24) ^ 0x0A; }
+static bool is_ex_ip(std::uint32_t ip) { return (ip >> 24) != 0x0A; }
 
 RouterBase *create_router_object() { return new Router; }
 
@@ -131,6 +131,7 @@ void Router::packet_dv(char *packet)
 
 void Router::release_nat(char *cmd_arg)
 {
+    log_debug("release", cmd_arg);
     std::uint32_t ip{parser_ip_str(cmd_arg)};
     auto iter{m_nat_map.find(ip)};
     if (iter != m_nat_map.end())
@@ -193,56 +194,53 @@ int Router::process_data_packet(int in_port, char *packet)
     log_debug("Data ", src, " --> ", dst);
     if (m_block.contains(src))
         return -1;
-    bool src_is_ex{is_ex_ip(src)}, dst_is_ex{is_ex_ip(dst)};
-    if (src_is_ex)
+    bool dst_is_ex{is_ex_ip(dst)};
+    if (in_port == m_ex_port)
     {
-        if (dst_is_ex)
-        {
-            auto reverse_nat_ip_iter{m_reverse_nat_map.find(dst)};
-            if (reverse_nat_ip_iter == m_reverse_nat_map.end())
-                return -1;
-            dst = reverse_nat_ip_iter->second;
-            header_ptr->set_dst(dst);
-        }
-        auto dst_port_iter{m_dv_map.find(dst)};
+        auto dst_nat_iter{m_reverse_nat_map.find(dst)};
+        if (dst_nat_iter == m_reverse_nat_map.end())
+            return -1;
+        std::uint32_t new_dst{dst_nat_iter->second};
+        header_ptr->set_dst(new_dst);
+        auto dst_port_iter{m_dv_map.find(new_dst)};
         if (dst_port_iter == m_dv_map.end())
             return 1;
         return dst_port_iter->second.port;
     }
+    if (dst_is_ex)
+    {
+        auto dst_port_iter{m_ex_dv_map.find(dst)};
+        if (dst_port_iter == m_ex_dv_map.end())
+            return -1;
+        int port{dst_port_iter->second.port};
+        if (port == m_ex_port)
+        {
+            log_debug("nat");
+            auto src_nat_iter{m_nat_map.find(src)};
+            std::uint32_t new_src;
+            if (src_nat_iter != m_nat_map.end())
+                new_src = src_nat_iter->second;
+            else
+            {
+                log_debug("New nat");
+                if (m_available_addrs.empty())
+                    return -1;
+                new_src = m_available_addrs.back();
+                m_available_addrs.pop_back();
+                log_debug(m_available_addrs.size());
+                m_nat_map.insert({src, new_src});
+                m_reverse_nat_map.insert({new_src, src});
+            }
+            header_ptr->set_src(new_src);
+        }
+        return port;
+    }
     else
     {
-        if (dst_is_ex)
-        {
-            auto dst_port_iter{m_ex_dv_map.find(dst)};
-            if (dst_port_iter == m_ex_dv_map.end())
-                return 1;
-            int port{dst_port_iter->second.port};
-            if (port == m_ex_port)
-            {
-                auto nat_ip_iter{m_nat_map.find(src)};
-                std::uint32_t new_nat_ip;
-                if (nat_ip_iter != m_nat_map.end())
-                    new_nat_ip = nat_ip_iter->second;
-                else
-                {
-                    if (m_available_addrs.empty())
-                        return -1;
-                    new_nat_ip = m_available_addrs.back();
-                    m_available_addrs.pop_back();
-                    m_nat_map.insert({src, new_nat_ip});
-                    m_reverse_nat_map.insert({new_nat_ip, src});
-                }
-                header_ptr->set_src(new_nat_ip);
-            }
-            return port;
-        }
-        else
-        {
-            auto dst_port_iter{m_dv_map.find(dst)};
-            if (dst_port_iter == m_dv_map.end())
-                return 1;
-            return dst_port_iter->second.port;
-        }
+        auto dst_port_iter{m_dv_map.find(dst)};
+        if (dst_port_iter == m_dv_map.end())
+            return 1;
+        return dst_port_iter->second.port;
     }
 }
 
@@ -296,32 +294,54 @@ int Router::process_dv_packet(int in_port, char *packet)
         auto dv_iter{m_dv_map.find(p.ip)};
         if (dv_iter == m_dv_map.end())
         {
-            m_dv_map.insert({p.ip, {port_value + p.distance, in_port}});
+            m_dv_map.insert({p.ip, {port_value + p.distance, in_port, true}});
             change = true;
         }
-        else if (dv_iter->second.distance > p.distance + port_value)
+        else
         {
-            dv_iter->second.distance = p.distance + port_value;
-            dv_iter->second.port = in_port;
-            change = true;
+            if (dv_iter->second.distance > p.distance + port_value)
+            {
+                dv_iter->second.distance = p.distance + port_value;
+                dv_iter->second.port = in_port;
+                change = true;
+            }
+            dv_iter->second.valid = true;
         }
     }
+
+    if (std::erase_if(m_dv_map, [in_port](std::pair<const std::uint32_t, map_entry> &p)
+                      { return p.second.port == in_port && !p.second.valid; }) > 0)
+        change = true;
+
+    std::ranges::for_each(m_dv_map, [](std::pair<const std::uint32_t, map_entry> &p)
+                          { p.second.valid = false; });
 
     for (auto &p : ex_dv_table)
     {
         auto dv_iter{m_ex_dv_map.find(p.ip_range)};
         if (dv_iter == m_ex_dv_map.end())
         {
-            m_ex_dv_map.insert({p.ip_range, {port_value + p.distance, in_port}});
+            m_ex_dv_map.insert({p.ip_range, {port_value + p.distance, in_port, true}});
             change = true;
         }
-        else if (dv_iter->second.distance > p.distance + port_value)
+        else
         {
-            dv_iter->second.distance = p.distance + port_value;
-            dv_iter->second.port = in_port;
-            change = true;
+            if (dv_iter->second.distance > p.distance + port_value)
+            {
+                dv_iter->second.distance = p.distance + port_value;
+                dv_iter->second.port = in_port;
+                change = true;
+            }
+            dv_iter->second.valid = true;
         }
     }
+
+    if (std::erase_if(m_ex_dv_map, [in_port](std::pair<const ex_map_key, map_entry> &p)
+                      { return p.second.port == in_port && !p.second.valid; }) > 0)
+        change = true;
+
+    std::ranges::for_each(m_ex_dv_map, [](std::pair<const ex_map_key, map_entry> &p)
+                          { p.second.valid = false; });
     if (!change)
         return -1;
 
@@ -344,7 +364,7 @@ void Router::router_init(int port_num, int external_port, char *external_addr,
         m_ex_dv_map.insert({{ex_ip_start, ex_ip_end}, {0, m_ex_port}});
         m_available_addrs.reserve(256);
         auto [available_ip_start, available_ip_end]{parser_ip_range(available_addr)};
-        for (auto ip : std::views::iota(available_ip_start, available_ip_end))
+        for (auto ip : std::views::iota(available_ip_start, available_ip_end + 1))
             m_available_addrs.push_back(ip);
     }
 }
@@ -352,10 +372,14 @@ void Router::router_init(int port_num, int external_port, char *external_addr,
 int Router::router(int in_port, char *packet)
 {
     const header *header_ptr{reinterpret_cast<header *>(packet)};
+    int new_port;
     switch (header_ptr->get_type())
     {
     case header_type::data:
-        return process_data_packet(in_port, packet);
+        new_port = process_data_packet(in_port, packet);
+        if (new_port == in_port)
+            return -1;
+        return new_port;
     case header_type::dv:
         return process_dv_packet(in_port, packet);
     case header_type::control:

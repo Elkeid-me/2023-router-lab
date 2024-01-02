@@ -48,6 +48,7 @@ struct map_entry
 {
     std::uint32_t distance;
     int port;
+    bool valid{false};
 };
 
 struct dv_table_entry
