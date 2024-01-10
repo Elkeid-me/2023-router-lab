@@ -121,11 +121,7 @@ void Router::port_value_change(char *cmd_arg)
     char *tmp;
     int port{static_cast<int>(std::strtol(cmd_arg, &tmp, 10))};
     int value{static_cast<int>(std::strtol(tmp + 1, nullptr, 10))};
-    if (tmp[1] == '-')
-    {
-        value = -1;
-        log_debug("Delete connection");
-    }
+    log_debug("Change port ", port, ": ", m_port_value[port], " --> ", value);
     if (value == -1)
     {
         m_port_value[port] = -1;
@@ -139,17 +135,17 @@ void Router::port_value_change(char *cmd_arg)
     else if (m_port_value[port] == -1)
     {
         m_port_value[port] = value;
-        if (port == m_ex_port)
-            std::ranges::for_each(m_dv_map,
-                                  [port](std::pair<const std::uint32_t, map_entry> &p)
-                                  {
-                                      if (p.second.port == port)
-                                          p.second.distance = 0;
-                                  });
+        std::ranges::for_each(m_dv_map,
+                              [port](std::pair<const std::uint32_t, map_entry> &p)
+                              {
+                                  if (p.second.port == port && p.second.next == 0)
+                                      p.second.distance = 0;
+                              });
     }
     else
     {
         int difference{value - m_port_value[port]};
+        m_port_value[port] = value;
         std::ranges::for_each(
             m_dv_map,
             [port, difference](std::pair<const std::uint32_t, map_entry> &p)
@@ -164,7 +160,7 @@ void Router::add_host(char *cmd_arg)
     char *tmp;
     int port{static_cast<int>(std::strtol(cmd_arg, &tmp, 10))};
     std::uint32_t ip{parser_ip_str(tmp + 1)};
-    m_dv_map.insert({ip, {0, port}});
+    m_dv_map.insert({ip, {0, port, 0}});
     m_port_value[port] = 0;
 }
 void Router::block(char *cmd_arg) { m_block.insert(parser_ip_str(cmd_arg)); }
@@ -220,14 +216,13 @@ int Router::process_control_packet(int in_port, char *packet)
     payload_ptr[header_ptr->get_length()] = '\0';
     switch (*payload_ptr)
     {
+    case '2':
+        port_value_change(payload_ptr + 2);
     case '0':
         packet_dv(packet);
         return 0;
     case '1':
         release_nat(payload_ptr + 2);
-        break;
-    case '2':
-        port_value_change(payload_ptr + 2);
         break;
     case '3':
         add_host(payload_ptr + 2);
