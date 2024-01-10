@@ -46,27 +46,16 @@ public:
 
 struct map_entry
 {
-    std::uint32_t distance;
+    int distance;
     int port;
-    bool valid{false};
+    std::uint32_t next;
 };
 
 struct dv_table_entry
 {
     std::uint32_t ip;
-    std::uint32_t distance;
-};
-
-struct ex_map_key
-{
-    std::uint32_t start;
-    std::uint32_t end;
-};
-
-struct ex_dv_table_entry
-{
-    ex_map_key ip_range;
-    std::uint32_t distance;
+    int distance;
+    std::uint32_t next;
 };
 
 class Router : public RouterBase
@@ -74,10 +63,8 @@ class Router : public RouterBase
 private:
     // nat 映射，从内网地址到外网地址; nat 逆映射，从外网地址到内网地址.
     std::unordered_map<std::uint32_t, std::uint32_t> m_nat_map, m_reverse_nat_map;
-    // 内网距离向量表与路由表.
+    // 距离向量表与路由表.
     std::unordered_map<std::uint32_t, map_entry> m_dv_map;
-    // 外网距离向量表与路由表.
-    std::map<ex_map_key, map_entry, std::less<>> m_ex_dv_map;
     // 被屏蔽的源地址.
     std::unordered_set<std::uint32_t> m_block;
     // 可用的外网地址集合.
@@ -87,6 +74,8 @@ private:
 
     int m_ex_port{0};
     int m_port_num{0};
+
+    std::uint32_t m_id;
 
     int process_data_packet(int, char *);
     int process_dv_packet(int, char *);
