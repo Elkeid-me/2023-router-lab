@@ -70,7 +70,6 @@ static std::pair<std::uint32_t, std::uint32_t> parser_ip_range(char *ip)
     *slash_ptr = '\0';
     std::uint32_t mask{mask_1[std::strtoll(slash_ptr + 1, nullptr, 10)]};
     std::uint32_t prefix{parser_ip_str(ip) & mask};
-    log_debug("ip ", prefix, ' ', mask);
     return {prefix, prefix + ~mask};
 }
 
@@ -107,7 +106,6 @@ void Router::packet_dv(char *packet)
 
 void Router::release_nat(char *cmd_arg)
 {
-    log_debug("release", cmd_arg);
     std::uint32_t ip{parser_ip_str(cmd_arg)};
     auto iter{m_nat_map.find(ip)};
     if (iter != m_nat_map.end())
@@ -123,6 +121,11 @@ void Router::port_value_change(char *cmd_arg)
     char *tmp;
     int port{static_cast<int>(std::strtol(cmd_arg, &tmp, 10))};
     int value{static_cast<int>(std::strtol(tmp + 1, nullptr, 10))};
+    if (tmp[1] == '-')
+    {
+        value = -1;
+        log_debug("Delete connection");
+    }
     if (value == -1)
     {
         m_port_value[port] = -1;
@@ -133,15 +136,25 @@ void Router::port_value_change(char *cmd_arg)
                                       p.second.distance = -1;
                               });
     }
+    else if (m_port_value[port] == -1)
+    {
+        m_port_value[port] = value;
+        if (port == m_ex_port)
+            std::ranges::for_each(m_dv_map,
+                                  [port](std::pair<const std::uint32_t, map_entry> &p)
+                                  {
+                                      if (p.second.port == port)
+                                          p.second.distance = 0;
+                                  });
+    }
     else
     {
         int difference{value - m_port_value[port]};
-        m_port_value[port] = value;
         std::ranges::for_each(
             m_dv_map,
             [port, difference](std::pair<const std::uint32_t, map_entry> &p)
             {
-                if (p.second.port == port && p.second.distance != -1)
+                if (p.second.port == port)
                     p.second.distance += difference;
             });
     }
@@ -153,7 +166,6 @@ void Router::add_host(char *cmd_arg)
     std::uint32_t ip{parser_ip_str(tmp + 1)};
     m_dv_map.insert({ip, {0, port}});
     m_port_value[port] = 0;
-    log_debug("Add host ", port, ' ', ip);
 }
 void Router::block(char *cmd_arg) { m_block.insert(parser_ip_str(cmd_arg)); }
 void Router::unblock(char *cmd_arg) { m_block.erase(parser_ip_str(cmd_arg)); }
@@ -162,7 +174,6 @@ int Router::process_data_packet(int in_port, char *packet)
 {
     header *header_ptr{reinterpret_cast<header *>(packet)};
     std::uint32_t src{header_ptr->get_src()}, dst{header_ptr->get_dst()};
-    log_debug("Data ", src, " --> ", dst);
     if (m_block.contains(src))
         return -1;
     if (in_port == m_ex_port)
@@ -184,19 +195,16 @@ int Router::process_data_packet(int in_port, char *packet)
 
     if (dst_port_iter->second.port == m_ex_port)
     {
-        log_debug("nat");
         auto src_nat_iter{m_nat_map.find(src)};
         std::uint32_t new_src;
         if (src_nat_iter != m_nat_map.end())
             new_src = src_nat_iter->second;
         else
         {
-            log_debug("New nat");
             if (m_available_addrs.empty())
                 return -1;
             new_src = m_available_addrs.back();
             m_available_addrs.pop_back();
-            log_debug(m_available_addrs.size());
             m_nat_map.insert({src, new_src});
             m_reverse_nat_map.insert({new_src, src});
         }
@@ -259,24 +267,18 @@ int Router::process_dv_packet(int in_port, char *packet)
                     change = true;
                 }
             }
-            else
+            else if (iter == m_dv_map.end())
             {
-                if (iter == m_dv_map.end())
-                {
-                    m_dv_map.insert({p.ip, {p.distance + port_value, in_port, id}});
-                    change = true;
-                }
-                else
-                {
-                    if (p.distance + port_value < iter->second.distance ||
-                        iter->second.distance == -1)
-                    {
-                        iter->second.distance = p.distance + port_value;
-                        iter->second.port = in_port;
-                        iter->second.next = id;
-                        change = true;
-                    }
-                }
+                m_dv_map.insert({p.ip, {p.distance + port_value, in_port, id}});
+                change = true;
+            }
+            else if (p.distance + port_value < iter->second.distance ||
+                     iter->second.distance == -1)
+            {
+                iter->second.distance = p.distance + port_value;
+                iter->second.port = in_port;
+                iter->second.next = id;
+                change = true;
             }
         }
     }
