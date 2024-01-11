@@ -81,34 +81,20 @@ RouterBase *create_router_object() { return new Router; }
 void Router::packet_dv(char *packet)
 {
     std::size_t dv_length{m_dv_map.size()};
-    header *header_ptr{reinterpret_cast<header *>(packet)};
-    header_ptr->make_header(0, 0, header_type::dv,
-                            sizeof(header) + sizeof(std::uint16_t) * 2 +
-                                sizeof(dv_table_entry) * dv_length);
-
-    std::uint16_t *dv_header{reinterpret_cast<std::uint16_t *>(packet + sizeof(header))};
-    dv_header[0] = m_id;
-    dv_header[1] = dv_length;
-
-    dv_table_entry *dv_table{reinterpret_cast<dv_table_entry *>(
-        packet + sizeof(header) + sizeof(std::uint16_t) * 2)};
-
-    std::size_t i{0};
-
-    for (auto &p : m_dv_map)
-    {
-        dv_table[i].ip = p.first;
-        dv_table[i].distance = p.second.distance;
-        dv_table[i].next = p.second.next;
-        i++;
-    }
+    reinterpret_cast<header *>(packet)->make_header(m_id, dv_length, header_type::dv,
+                            sizeof(header) + sizeof(dv_table_entry) * dv_length);
+    std::ranges::copy(
+        std::views::transform(
+            m_dv_map,
+            [](std::pair<std::uint32_t, map_entry> p) {
+                return dv_table_entry{p.first, p.second.distance, p.second.next};
+            }),
+        reinterpret_cast<dv_table_entry *>(packet + sizeof(header)));
 }
 
 void Router::release_nat(char *cmd_arg)
 {
-    std::uint32_t ip{parser_ip_str(cmd_arg)};
-    auto iter{m_nat_map.find(ip)};
-    if (iter != m_nat_map.end())
+    if (auto iter{m_nat_map.find(parser_ip_str(cmd_arg))}; iter != m_nat_map.end())
     {
         m_available_addrs.push_back(iter->second);
         m_reverse_nat_map.erase(iter->second);
@@ -121,7 +107,6 @@ void Router::port_value_change(char *cmd_arg)
     char *tmp;
     int port{static_cast<int>(std::strtol(cmd_arg, &tmp, 10))};
     int value{static_cast<int>(std::strtol(tmp + 1, nullptr, 10))};
-    log_debug("Change port ", port, ": ", m_port_value[port], " --> ", value);
     if (value == -1)
     {
         m_port_value[port] = -1;
@@ -133,15 +118,7 @@ void Router::port_value_change(char *cmd_arg)
                               });
     }
     else if (m_port_value[port] == -1)
-    {
         m_port_value[port] = value;
-        std::ranges::for_each(m_dv_map,
-                              [port](std::pair<const std::uint32_t, map_entry> &p)
-                              {
-                                  if (p.second.port == port && p.second.next == 0)
-                                      p.second.distance = 0;
-                              });
-    }
     else
     {
         int difference{value - m_port_value[port]};
@@ -150,7 +127,7 @@ void Router::port_value_change(char *cmd_arg)
             m_dv_map,
             [port, difference](std::pair<const std::uint32_t, map_entry> &p)
             {
-                if (p.second.port == port)
+                if (p.second.port == port && p.second.distance == -1)
                     p.second.distance += difference;
             });
     }
@@ -239,13 +216,10 @@ int Router::process_control_packet(int in_port, char *packet)
 
 int Router::process_dv_packet(int in_port, char *packet)
 {
-    std::uint16_t *dv_header{reinterpret_cast<std::uint16_t *>(packet + sizeof(header))};
-    std::uint16_t id{dv_header[0]}, dv_length{dv_header[1]};
-
+    header *dv_header{reinterpret_cast<header *>(packet)};
+    std::uint32_t id{dv_header->get_src()}, dv_length{dv_header->get_dst()};
     std::span<dv_table_entry> dv_table(
-        reinterpret_cast<dv_table_entry *>(packet + sizeof(header) +
-                                           sizeof(std::uint16_t) * 2),
-        dv_length);
+        reinterpret_cast<dv_table_entry *>(packet + sizeof(header)), dv_length);
 
     bool change{false};
     int port_value{m_port_value[in_port]};
@@ -256,12 +230,13 @@ int Router::process_dv_packet(int in_port, char *packet)
             auto iter{m_dv_map.find(p.ip)};
             if (p.distance == -1)
             {
-                if (iter != m_dv_map.end() && iter->second.next == id)
+                if (iter != m_dv_map.end() && iter->second.port == in_port)
                 {
                     iter->second.distance = -1;
                     change = true;
                 }
             }
+
             else if (iter == m_dv_map.end())
             {
                 m_dv_map.insert({p.ip, {p.distance + port_value, in_port, id}});
@@ -315,14 +290,10 @@ void Router::router_init(int port_num, int external_port, char *external_addr,
 int Router::router(int in_port, char *packet)
 {
     const header *header_ptr{reinterpret_cast<header *>(packet)};
-    int new_port;
     switch (header_ptr->get_type())
     {
     case header_type::data:
-        new_port = process_data_packet(in_port, packet);
-        if (new_port == in_port)
-            return -1;
-        return new_port;
+        return process_data_packet(in_port, packet);
     case header_type::dv:
         return process_dv_packet(in_port, packet);
     case header_type::control:

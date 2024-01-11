@@ -1,6 +1,5 @@
 #include "router_prototype.hxx"
 #include <cstdint>
-#include <map>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
