@@ -222,12 +222,12 @@ int Router::process_dv_packet(int in_port, char *packet)
 
     bool change{false};
     int port_value{m_port_value[in_port]};
-    for (auto &p : dv_table)
+    for (auto [ip, distance, next] : dv_table)
     {
-        if (p.next != m_id)
+        if (next != m_id)
         {
-            auto iter{m_dv_map.find(p.ip)};
-            if (p.distance == -1)
+            auto iter{m_dv_map.find(ip)};
+            if (distance == -1)
             {
                 if (iter != m_dv_map.end() && iter->second.port == in_port)
                 {
@@ -238,13 +238,13 @@ int Router::process_dv_packet(int in_port, char *packet)
 
             else if (iter == m_dv_map.end())
             {
-                m_dv_map.insert({p.ip, {p.distance + port_value, in_port, id}});
+                m_dv_map.insert({ip, {distance + port_value, in_port, id}});
                 change = true;
             }
-            else if (p.distance + port_value < iter->second.distance ||
+            else if (distance + port_value < iter->second.distance ||
                      iter->second.distance == -1)
             {
-                iter->second.distance = p.distance + port_value;
+                iter->second.distance = distance + port_value;
                 iter->second.port = in_port;
                 iter->second.next = id;
                 change = true;
