@@ -229,7 +229,8 @@ int Router::process_dv_packet(int in_port, char *packet)
             auto iter{m_dv_map.find(ip)};
             if (distance == -1)
             {
-                if (iter != m_dv_map.end() && iter->second.port == in_port)
+                if (iter != m_dv_map.end() && iter->second.port == in_port &&
+                    iter->second.distance != -1)
                 {
                     iter->second.distance = -1;
                     change = true;
@@ -244,9 +245,7 @@ int Router::process_dv_packet(int in_port, char *packet)
             else if (distance + port_value < iter->second.distance ||
                      iter->second.distance == -1)
             {
-                iter->second.distance = distance + port_value;
-                iter->second.port = in_port;
-                iter->second.next = id;
+                iter->second = {distance + port_value, in_port, id};
                 change = true;
             }
         }
