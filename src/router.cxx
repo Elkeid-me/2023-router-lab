@@ -82,11 +82,11 @@ void Router::packet_dv(char *packet)
 {
     std::size_t dv_length{m_dv_map.size()};
     reinterpret_cast<header *>(packet)->make_header(m_id, dv_length, header_type::dv,
-                            sizeof(header) + sizeof(dv_table_entry) * dv_length);
+                                                    sizeof(dv_table_entry) * dv_length);
     std::ranges::copy(
         std::views::transform(
             m_dv_map,
-            [](std::pair<std::uint32_t, map_entry> p) {
+            [](auto p) {
                 return dv_table_entry{p.first, p.second.distance, p.second.next};
             }),
         reinterpret_cast<dv_table_entry *>(packet + sizeof(header)));
@@ -111,7 +111,7 @@ void Router::port_value_change(char *cmd_arg)
     {
         m_port_value[port] = -1;
         std::ranges::for_each(m_dv_map,
-                              [port](std::pair<const std::uint32_t, map_entry> &p)
+                              [port](auto &p)
                               {
                                   if (p.second.port == port)
                                       p.second.distance = -1;
@@ -123,13 +123,12 @@ void Router::port_value_change(char *cmd_arg)
     {
         int difference{value - m_port_value[port]};
         m_port_value[port] = value;
-        std::ranges::for_each(
-            m_dv_map,
-            [port, difference](std::pair<const std::uint32_t, map_entry> &p)
-            {
-                if (p.second.port == port && p.second.distance == -1)
-                    p.second.distance += difference;
-            });
+        std::ranges::for_each(m_dv_map,
+                              [port, difference](auto &p)
+                              {
+                                  if (p.second.port == port && p.second.distance != -1)
+                                      p.second.distance += difference;
+                              });
     }
 }
 void Router::add_host(char *cmd_arg)
